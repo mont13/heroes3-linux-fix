@@ -168,6 +168,95 @@ what each of them means.
 
 ---
 
+## If the scripts stop working — do it by hand
+
+These scripts will age. Wine, package names and desktop environments change.
+The findings behind them will not, so here is the whole fix as six manual
+steps. Everything below is explained in detail, with the exact error messages,
+in [docs/ROOT-CAUSES.md](docs/ROOT-CAUSES.md).
+
+**1. Get a Wine 9+ runtime.** If a Windows program starts but never opens a
+window, and `/proc/<pid>/status` shows a single thread while
+`/proc/<pid>/wchan` says `futex_do_wait`, the Wine build is broken. Use another
+one — the game is fine.
+
+```bash
+sudo apt install -y wine wine32 wine64
+```
+
+**2. Install the 32-bit host libraries.** The game is a 32-bit process, so it
+needs i386 builds. Miss `libudev1:i386` and you get a picture but no sound.
+
+```bash
+sudo dpkg --add-architecture i386 && sudo apt update
+sudo apt install -y libgl1:i386 libglx-mesa0:i386 libgl1-mesa-dri:i386 \
+                    libpulse0:i386 libasound2t64:i386 libudev1:i386
+```
+
+If those packages no longer exist, take them from this repository's
+[release](../../releases) and `sudo dpkg -i offline-libs/*.deb`.
+
+**3. Replace GOG's DirectDraw wrapper.** `xdd.dll` in the game folder is
+DDrawCompat and it crashes under Wine. Overwrite it with the `ddraw.dll` from
+your own Wine installation — same file name, no download.
+
+```bash
+cd "/path/to/HoMM 3 Complete"
+cp -a xdd.dll xdd.dll.backup
+cp /usr/lib/i386-linux-gnu/wine/i386-windows/ddraw.dll xdd.dll
+```
+
+For a Proton build the source path is
+`<proton>/files/lib/wine/i386-windows/ddraw.dll` instead.
+
+**4. Set two Wine options.** The first stops Wine asserting in `xvidmode.c`
+when the game changes resolution; the second stops ALSA grabbing a
+disconnected HDMI audio output and freezing the game.
+
+```bash
+export WINEPREFIX=~/.local/share/heroes3-linux-fix/prefix
+wine reg add 'HKEY_CURRENT_USER\Software\Wine\X11 Driver' /v UseXVidMode /t REG_SZ /d N /f
+wine reg add 'HKEY_CURRENT_USER\Software\Wine\Drivers'    /v Audio       /t REG_SZ /d pulse /f
+```
+
+**5. With a Proton build only, add the vkd3d DLLs.** Proton keeps them outside
+the Wine directory and its wrapper script normally installs them:
+
+```bash
+cp <proton>/files/lib/vkd3d/i386-windows/*.dll   "$WINEPREFIX/drive_c/windows/syswow64/"
+cp <proton>/files/lib/vkd3d/x86_64-windows/*.dll "$WINEPREFIX/drive_c/windows/system32/"
+```
+
+**6. Run the game on a nested X server.** This is what makes the picture
+refresh properly. Without it the window manager keeps the window off 0,0, Wine
+uses the windowed DirectDraw path, and the screen only updates when you
+Alt+Tab.
+
+```bash
+Xephyr :89 -screen 800x600 -title "Heroes III" &
+cd "/path/to/HoMM 3 Complete"
+DISPLAY=:89 wine Heroes3.exe
+```
+
+For full screen, switch your display to 800×600 first
+(`xrandr --output <output> --mode 800x600`), add `-fullscreen` to the Xephyr
+command, and switch back afterwards.
+
+### Diagnosing something new
+
+```bash
+WINEDEBUG=fixme-all wine Heroes3.exe 2>&1 | tee log     # read the FIRST err: line
+grep -E '^(State|Threads)' /proc/$(pgrep -x Heroes3.exe)/status
+ls -l /proc/$(pgrep -x Heroes3.exe)/fd | grep -E 'snd|dri'
+ldd /usr/lib/i386-linux-gnu/wine/i386-unix/*.so | grep 'not found'
+```
+
+One thread means it hung before it started. `/proc/<pid>/fd` shows which audio
+and graphics devices it actually opened. The `ldd` line lists every host
+library a Wine driver is missing, in one shot.
+
+---
+
 ## Known limitations
 
 * **Heroes III is a 800×600 game.** Nothing here changes that. `--fullscreen`
