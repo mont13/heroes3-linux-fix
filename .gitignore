@@ -1,0 +1,22 @@
+# never commit game files - they are copyrighted
+*.exe
+*.dll
+*.DLL
+*.lod
+*.LOD
+*.bin
+*.vid
+*.snd
+
+# never commit downloaded packages or build output
+offline-libs/
+*.deb
+*.tar.gz
+*.tar.xz
+*.zip
+
+# logs, backups and local state
+logs/
+backup/
+*.log
+*.png
