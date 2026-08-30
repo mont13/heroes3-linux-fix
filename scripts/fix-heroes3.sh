@@ -203,8 +203,14 @@ elif file_contains "$GAME_DIR/xdd.dll" "DDrawCompat"; then
   cp -a "$PE_DIR/ddraw.dll" "$GAME_DIR/xdd.dll" \
     && ok "replaced GOG's DDrawCompat (xdd.dll) with Wine's ddraw" \
     || err "could not write $GAME_DIR/xdd.dll"
+elif [ "$(md5of "$GAME_DIR/xdd.dll")" = "$(md5of "$PE_DIR/ddraw.dll")" ]; then
+  ok "xdd.dll already matches this Wine build's ddraw"
 else
-  ok "xdd.dll is already Wine's ddraw"
+  # It is already a Wine ddraw, but from a different build. ddraw and wined3d
+  # are a matched pair, so keep them from the same Wine as everything else.
+  cp -a "$PE_DIR/ddraw.dll" "$GAME_DIR/xdd.dll" \
+    && ok "refreshed xdd.dll from the Wine build in use (it came from a different one)" \
+    || err "could not write $GAME_DIR/xdd.dll"
 fi
 if [ -f "$GAME_DIR/DDrawCompat.ini" ]; then
   mv "$GAME_DIR/DDrawCompat.ini" "$BACKUP/DDrawCompat.ini" 2>/dev/null \

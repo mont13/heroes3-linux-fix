@@ -63,13 +63,21 @@ wine_version() { "$1" --version 2>/dev/null | head -1; }
 wine_major() { wine_version "$1" | sed -n 's/^wine-\([0-9]\+\).*/\1/p'; }
 
 # Directory holding the PE-format builtin DLLs of that wine build.
+# Proton and self-built Wine use lib/wine/i386-windows; distribution packages
+# use a multiarch path such as /usr/lib/i386-linux-gnu/wine/i386-windows.
 wine_pe_dir() {  # <wine binary> -> path containing i386-windows DLLs
   local base; base="$(dirname "$(dirname "$1")")"
   local d
-  for d in "$base/lib/wine/i386-windows" "$base/lib32/wine/i386-windows" \
-           "$base/lib/wine/i386-unix/../i386-windows"; do
+  for d in "$base/lib/wine/i386-windows" \
+           "$base/lib32/wine/i386-windows" \
+           "$base/lib/i386-linux-gnu/wine/i386-windows" \
+           "$base/lib/x86_64-linux-gnu/wine/i386-windows" \
+           "$base/lib64/wine/i386-windows"; do
     [ -d "$d" ] && { echo "$d"; return; }
   done
+  # last resort: ask the loader itself
+  d="$(find "$base/lib" "$base/lib64" -maxdepth 4 -type d -name i386-windows 2>/dev/null | head -1)"
+  [ -n "$d" ] && { echo "$d"; return; }
   return 1
 }
 
@@ -158,10 +166,18 @@ wine_reg_del() {  # <wine> <prefix> <key> <value>
     "HKEY_CURRENT_USER\\Software\\Wine\\$3" /v "$4" /f >/dev/null 2>&1 || true
 }
 
+# Stop only what belongs to OUR prefix. A blanket `pkill -x Heroes3.exe` would
+# also kill a game the user is playing from a different prefix - do not do that.
 wine_stop() {  # <wine> <prefix>
-  local ws; ws="$(dirname "$1")/wineserver"
+  local ws pid env_prefix
+  ws="$(dirname "$1")/wineserver"
   [ -x "$ws" ] && WINEPREFIX="$2" "$ws" -k >/dev/null 2>&1
   sleep 2
-  pgrep -x Heroes3.exe >/dev/null && { pkill -9 -x Heroes3.exe; sleep 1; }
+  for pid in $(pgrep -x Heroes3.exe 2>/dev/null); do
+    env_prefix="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^WINEPREFIX=//p' | head -1)"
+    if [ "$env_prefix" = "$2" ]; then
+      kill -9 "$pid" 2>/dev/null
+    fi
+  done
   return 0
 }

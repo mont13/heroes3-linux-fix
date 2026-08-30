@@ -65,14 +65,55 @@ Already have the game installed through Heroic, Lutris or Steam? Skip step 2 —
 
 * A 64-bit Ubuntu/Debian-based system (other distributions work, but
   `install-deps.sh` only knows `apt` — install the equivalents by hand).
-* **Wine 9 or newer**, or a GE-Proton 9/10 build. Wine 8.x builds hang on
-  current kernels; see [docs/ROOT-CAUSES.md](docs/ROOT-CAUSES.md#1-broken-wine-runner).
-  The scripts auto-detect Wine from `/usr/bin`, Heroic and Steam. Override with
-  `HEROES3_WINE=/path/to/wine`.
+* **A Wine runtime, version 9 or newer** — either works, pick whichever you
+  already have (details below). Wine 8.x builds hang on current kernels; see
+  [docs/ROOT-CAUSES.md](docs/ROOT-CAUSES.md#1-broken-wine-runner).
 * Your own copy of Heroes III Complete (GOG offline installer, or an existing
   install).
 * About 2 GB of disk space for the game plus roughly 200 MB for the 32-bit
   libraries.
+
+---
+
+## Choosing a Wine runtime
+
+Two options, both verified with this repository. You do **not** need both —
+install whichever suits you and the scripts pick it up automatically.
+
+### Option A — your distribution's Wine (simplest)
+
+```bash
+sudo apt install -y wine wine32 wine64
+```
+
+Ubuntu 24.04 ships Wine 9.0, which is new enough. About 300 MB of packages.
+Nothing else to configure: the scripts find `/usr/bin/wine` on their own.
+
+### Option B — GE-Proton (if you already use Heroic, Lutris or Steam)
+
+Install a GE-Proton 9 or 10 build through your launcher, or drop it in
+`~/.steam/steam/compatibilitytools.d/`. The scripts search Heroic's and Steam's
+tool directories and prefer a Proton build when they find one, because those
+builds track Wine more closely.
+
+One extra step is handled for you: Proton keeps `libvkd3d` outside the normal
+Wine directory and only installs it into a prefix through its own wrapper
+script. `fix-heroes3.sh` copies the missing DLLs in, otherwise the game cannot
+load `ddraw` at all — see the
+[appendix](docs/ROOT-CAUSES.md#appendix-proton-builds-need-one-extra-step).
+
+### Forcing a specific one
+
+```bash
+HEROES3_WINE=/usr/bin/wine ./scripts/fix-heroes3.sh
+```
+
+Auto-detection order: `HEROES3_WINE`, then Proton builds under Heroic and Steam,
+then system Wine. `./scripts/fix-heroes3.sh --status` prints which one it picked.
+
+If you switch between runtimes later, just run `fix-heroes3.sh` again: `ddraw`
+and `wined3d` are a matched pair, and the script refreshes the game's copy so
+both come from the same Wine build.
 
 ---
 

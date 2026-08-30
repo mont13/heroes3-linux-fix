@@ -248,3 +248,21 @@ err:module:loader_init Importing dlls failed, status c0000135
 
 `fix-heroes3.sh` copies the missing DLLs into the prefix's `system32` and
 `syswow64` after creating it. Plain Wine builds are unaffected.
+
+---
+
+## Verified runtimes
+
+Both were tested end to end against a fresh Wine prefix on Ubuntu 24.04.3, and
+both pass every automated check in `fix-heroes3.sh` (window opens at 800×600,
+the process reaches ~56 threads, the picture refreshes in 3 of 3 samples taken
+5 s apart, an audio driver loads):
+
+| Runtime | Version | Notes |
+|---|---|---|
+| Distribution Wine | `wine-9.0 (Ubuntu 9.0~repack-4build3)` | `apt install wine wine32 wine64`. Nothing extra needed. PE DLLs live in `/usr/lib/i386-linux-gnu/wine/i386-windows`. |
+| GE-Proton | `wine-10.0 (Staging)`, GE-Proton10-27 | Needs the `libvkd3d` DLLs copied into the prefix, which `fix-heroes3.sh` does. PE DLLs live in `<proton>/files/lib/wine/i386-windows`. |
+
+`ddraw.dll` and `wined3d.dll` are a matched pair from the same Wine build, so
+the game's `xdd.dll` is refreshed whenever you switch runtimes. Mixing them
+happens to work, but is not something to rely on.
